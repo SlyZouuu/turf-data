@@ -1,0 +1,34 @@
+name: Enregistrement des cotes PMU
+
+on:
+  schedule:
+    # Heures UTC. Trois sessions de ~5 h 50 qui se chevauchent pour couvrir 10 h 30 - minuit (heure de Paris).
+    - cron: "15 8 * * *"
+    - cron: "5 13 * * *"
+    - cron: "55 17 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  enregistrer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 358
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Enregistrer les cotes
+        run: python3 scripts/enregistreur_cotes.py --duree 345 --suffixe "$(date -u +%H%M)"
+      - name: Sauvegarder dans le dépôt
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add donnees/cotes
+          git diff --cached --quiet && exit 0
+          git commit -m "Cotes du $(date -u +%F) (session $(date -u +%H%M))"
+          for i in 1 2 3 4 5; do git pull --rebase && git push && exit 0; sleep $((i*10)); done
+          exit 1
